@@ -1,0 +1,57 @@
+/* Transition effects */
+.section .background {
+    transition: transform 0.5s ease-out;
+}
+
+.section .content {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 1s ease;
+}
+
+.section.active .content {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Header transition */
+.header-scrolled {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Navigation hover effects */
+.navbar a {
+    position: relative;
+    overflow: hidden;
+}
+
+.navbar a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #fff;
+    transition: width 0.3s ease;
+}
+
+.navbar a:hover::after {
+    width: 100%;
+}
+
+/* Content fade-in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 1s ease forwards;
+} 
