@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eddie's Portfolio</title>
+    <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/reset.css">
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/animations.css">
+
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <!-- Add custom CSS for SplashCursor -->
+    <style>
+        #splash-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- SplashCursor Canvas -->
+    <canvas id="splash-cursor"></canvas>
+
+    <header>
+        <a href="#" class="logo"><img src="assets/images/favicon.ico" alt="favicon" class="nav-favicon">Eddie</a>
+        <nav class="navbar">
+            <a href="#research">My Research</a>
+            <a href="#project">My Project</a>
+            <a href="#life">My Life</a>
+        </nav>
+    </header>
+
+    <section id="research" class="section">
+        <div class="background"></div>
+        <div class="content">
+            <h2>过去 (Past)</h2>
+            <h3>回忆如诗，经历如画<br>The memories like poetry, experiences like paintings</h3>
+            
+            <p class="chinese-text">我曾经的足迹，化作今日的养分</p>
+            <p class="english-text">My past footprints transformed into today's nourishment</p>
+            
+            <p class="chinese-text">每一次跌倒，每一次尝试</p>
+            <p class="english-text">Each fall, each attempt</p>
+            
+            <p class="chinese-text">都在灵魂上留下独特的纹理</p>
+            <p class="english-text">Left unique textures on my soul</p>
+        </div>
+    </section>
+
+    <section id="project" class="section">
+        <div class="background"></div>
+        <div class="content">
+            <h2>现在 (Present)</h2>
+            <h3>此刻如歌，当下如舞<br>This moment like a song, the present like a dance</h3>
+            
+            <p class="chinese-text">站在时间的交叉点</p>
+            <p class="english-text">Standing at the crossroads of time</p>
+            
+            <p class="chinese-text">感受创作的脉搏与热情</p>
+            <p class="english-text">Feeling the pulse and passion of creation</p>
+            
+            <p class="chinese-text">将所见所闻，化为艺术的表达</p>
+            <p class="english-text">Transforming what I see and hear into artistic expression</p>
+        </div>
+    </section>
+
+    <section id="life" class="section">
+        <div class="background"></div>
+        <div class="content">
+            <h2>未来 (Future)</h2>
+            <h3>梦想如星，愿景如海<br>Dreams like stars, vision like the sea</h3>
+            
+            <p class="chinese-text">在未知的画布上，描绘无限可能</p>
+            <p class="english-text">On the unknown canvas, painting infinite possibilities</p>
+            
+            <p class="chinese-text">跨越边界，融合创新</p>
+            <p class="english-text">Crossing boundaries, merging innovations</p>
+            
+            <p class="chinese-text">以艺术之名，探索未竟之路</p>
+            <p class="english-text">In the name of art, exploring the unfinished path</p>
+        </div>
+    </section>
+
+    <!-- SplashCursor Script -->
+    <script>
+        // SplashCursor Implementation
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('splash-cursor');
+            const ctx = canvas.getContext('2d');
+            
+            // Make canvas full screen
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Default parameters from original SplashCursor.jsx
+            const SIM_RESOLUTION = 128;
+            const DYE_RESOLUTION = 1440;
+            const CAPTURE_RESOLUTION = 512;
+            const DENSITY_DISSIPATION = 3.5;
+            const VELOCITY_DISSIPATION = 2;
+            const PRESSURE = 0.1;
+            const PRESSURE_ITERATIONS = 20;
+            const CURL = 3;
+            const SPLAT_RADIUS = 0.2;
+            const SPLAT_FORCE = 6000;
+            const SHADING = true;
+            const COLOR_UPDATE_SPEED = 10;
+            const BACK_COLOR = { r: 0.5, g: 0, b: 0 };
+            const TRANSPARENT = true;
+            
+            // Particles array
+            const particles = [];
+            const particleCount = 50;
+            const particleBaseRadius = SPLAT_RADIUS * 50; // Scale based on SPLAT_RADIUS
+            const particleVariance = 5;
+            const particleBaseSpeed = 2;
+            const particleVarianceSpeed = 1;
+            const colors = ['#FF3366', '#33CCFF', '#9933FF', '#33FF99', '#FFFF66'];
+            
+            // Create initial particles
+            function createParticles() {
+                for (let i = 0; i < particleCount; i++) {
+                    // Generate color based on BACK_COLOR with variation
+                    const baseColor = BACK_COLOR;
+                    const r = Math.floor((baseColor.r * 255) + Math.random() * 100);
+                    const g = Math.floor((baseColor.g * 255) + Math.random() * 100);
+                    const b = Math.floor((baseColor.b * 255) + Math.random() * 100);
+                    const color = `rgb(${r}, ${g}, ${b})`;
+                    
+                    particles.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        radius: particleBaseRadius + Math.random() * particleVariance,
+                        color: color,
+                        speedX: particleBaseSpeed + (Math.random() * particleVarianceSpeed * 2 - particleVarianceSpeed),
+                        speedY: particleBaseSpeed + (Math.random() * particleVarianceSpeed * 2 - particleVarianceSpeed),
+                        alpha: TRANSPARENT ? 0.2 + Math.random() * 0.5 : 1.0
+                    });
+                }
+            }
+            
+            // Mouse tracking
+            const mousePosition = {
+                x: null,
+                y: null,
+                radius: 150 * SPLAT_RADIUS, // Scale based on SPLAT_RADIUS
+                isActive: false,
+                down: false
+            };
+            
+            // Splash effect particles
+            const splashParticles = [];
+            
+            // Track mouse movement
+            document.addEventListener('mousemove', function(e) {
+                mousePosition.x = e.clientX;
+                mousePosition.y = e.clientY;
+                mousePosition.isActive = true;
+                
+                // Create splash particles on mouse move, but only if mouse is down
+                if (mousePosition.down) {
+                    createSplashParticles(e.clientX, e.clientY, SPLAT_FORCE / 1000);
+                }
+            });
+            
+            // Track mouse down/up for more dynamic splashes
+            document.addEventListener('mousedown', function(e) {
+                mousePosition.down = true;
+                // Create a larger splash on mouse down
+                createSplashParticles(e.clientX, e.clientY, SPLAT_FORCE / 500);
+            });
+            
+            document.addEventListener('mouseup', function() {
+                mousePosition.down = false;
+            });
+            
+            // Create splash particles
+            function createSplashParticles(x, y, count) {
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 1 + Math.random() * 3;
+                    const baseColor = BACK_COLOR;
+                    const r = Math.floor((baseColor.r * 255) + Math.random() * 100);
+                    const g = Math.floor((baseColor.g * 255) + Math.random() * 100);
+                    const b = Math.floor((baseColor.b * 255) + Math.random() * 100);
+                    const color = `rgb(${r}, ${g}, ${b})`;
+                    
+                    splashParticles.push({
+                        x: x,
+                        y: y,
+                        radius: SPLAT_RADIUS * 15 * (0.5 + Math.random() * 0.5),
+                        color: color,
+                        speedX: Math.cos(angle) * speed * (SPLAT_FORCE / 1000),
+                        speedY: Math.sin(angle) * speed * (SPLAT_FORCE / 1000),
+                        life: 1, // Full life
+                        alpha: TRANSPARENT ? 0.7 + Math.random() * 0.3 : 1.0
+                    });
+                }
+            }
+            
+            // Animation
+            function animate() {
+                // Use a semi-transparent clear for a trailing effect if DENSITY_DISSIPATION is high
+                ctx.fillStyle = TRANSPARENT ? 
+                    `rgba(0, 0, 0, ${1 - Math.min(0.95, DENSITY_DISSIPATION / 10)})` : 
+                    'rgb(0, 0, 0)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw and update main particles
+                for (let i = 0; i < particles.length; i++) {
+                    let p = particles[i];
+                    
+                    // Draw particle
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fill();
+                    
+                    // Update position with velocity dissipation
+                    p.x += p.speedX * (1 - VELOCITY_DISSIPATION / 20);
+                    p.y += p.speedY * (1 - VELOCITY_DISSIPATION / 20);
+                    
+                    // Bounce off walls
+                    if (p.x - p.radius < 0 || p.x + p.radius > canvas.width) {
+                        p.speedX = -p.speedX;
+                    }
+                    if (p.y - p.radius < 0 || p.y + p.radius > canvas.height) {
+                        p.speedY = -p.speedY;
+                    }
+                    
+                    // Interaction with mouse
+                    if (mousePosition.isActive) {
+                        const dx = p.x - mousePosition.x;
+                        const dy = p.y - mousePosition.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < mousePosition.radius) {
+                            const angle = Math.atan2(dy, dx);
+                            const force = (mousePosition.radius - distance) / mousePosition.radius;
+                            
+                            p.x += Math.cos(angle) * force * 5;
+                            p.y += Math.sin(angle) * force * 5;
+                        }
+                    }
+                }
+                
+                // Draw and update splash particles
+                for (let i = splashParticles.length - 1; i >= 0; i--) {
+                    let p = splashParticles[i];
+                    
+                    // Draw splash particle
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha * p.life;
+                    ctx.fill();
+                    
+                    // Update position
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+                    
+                    // Reduce life
+                    p.life -= 0.02;
+                    
+                    // Remove dead particles
+                    if (p.life <= 0) {
+                        splashParticles.splice(i, 1);
+                    }
+                }
+                
+                // Reset alpha
+                ctx.globalAlpha = 1;
+                
+                requestAnimationFrame(animate);
+            }
+            
+            // Initialize
+            createParticles();
+            animate();
+        });
+    </script>
+</body>
+</html>

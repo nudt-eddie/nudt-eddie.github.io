@@ -1,0 +1,11 @@
+/* Fluid cursor canvas styles */
+#fluid-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2; /* Place behind content but above background */
+    pointer-events: none; /* Allow clicks to pass through to elements below */
+    opacity: 0.8; /* Slightly transparent to blend with the page */
+}

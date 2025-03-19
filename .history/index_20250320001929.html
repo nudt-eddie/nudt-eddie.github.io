@@ -10,32 +10,8 @@
     <link rel="stylesheet" href="assets/css/reset.css">
     <link rel="stylesheet" href="assets/css/main.css">
     <link rel="stylesheet" href="assets/css/animations.css">
-<!--  -->
-    <!-- React JS Libraries -->
-    <script src="https://cdn.staticfile.org/react/16.4.0/umd/react.development.js"></script>
-    <script src="https://cdn.staticfile.org/react-dom/16.4.0/umd/react-dom.development.js"></script>
-    <script src="https://cdn.staticfile.org/babel-standalone/6.26.0/babel.min.js"></script>
-
-    <style>
-        #App {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1000;
-            pointer-events: none;
-        }
-    </style>
-<!--  -->
 </head>
 <body>
-
-
-    <!-- React Application Root -->
-    <div id="App"></div>
-<!--  -->
-
     <header>
         <a href="#" class="logo"><img src="assets/images/favicon.ico" alt="favicon" class="nav-favicon">Eddie</a>
         <nav class="navbar">
@@ -96,16 +72,11 @@
         </div>
     </section>
 
-    <!-- Import the SplashCursor.jsx component -->
-    <script type="text/babel" src="assets/SplashCursor/SplashCursor.jsx"></script>
+    <!-- Canvas for fluid cursor effect -->
+    <canvas id="fluid-canvas"></canvas>
     
-    <!-- Render the SplashCursor component -->
-    <script type="text/babel">
-        ReactDOM.render(
-            <SplashCursor />,
-            document.getElementById('App')
-        );
-    </script>
-    <!--  -->
+    <!-- JavaScript -->
+    <script type="module" src="assets/js/main.js"></script>
+    <script src="assets/js/fluidCursor.js"></script>
 </body>
 </html>

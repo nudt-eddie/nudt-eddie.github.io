@@ -10,31 +10,15 @@
     <link rel="stylesheet" href="assets/css/reset.css">
     <link rel="stylesheet" href="assets/css/main.css">
     <link rel="stylesheet" href="assets/css/animations.css">
-<!--  -->
-    <!-- React JS Libraries -->
-    <script src="https://cdn.staticfile.org/react/16.4.0/umd/react.development.js"></script>
-    <script src="https://cdn.staticfile.org/react-dom/16.4.0/umd/react-dom.development.js"></script>
-    <script src="https://cdn.staticfile.org/babel-standalone/6.26.0/babel.min.js"></script>
 
-    <style>
-        #App {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1000;
-            pointer-events: none;
-        }
-    </style>
-<!--  -->
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 </head>
 <body>
-
-
-    <!-- React Application Root -->
-    <div id="App"></div>
-<!--  -->
+    <!-- SplashCursor Container -->
+    <div id="cursor-container"></div>
 
     <header>
         <a href="#" class="logo"><img src="assets/images/favicon.ico" alt="favicon" class="nav-favicon">Eddie</a>
@@ -96,16 +80,32 @@
         </div>
     </section>
 
-    <!-- Import the SplashCursor.jsx component -->
-    <script type="text/babel" src="assets/SplashCursor/SplashCursor.jsx"></script>
-    
-    <!-- Render the SplashCursor component -->
+    <!-- Script to load and render the SplashCursor component -->
     <script type="text/babel">
-        ReactDOM.render(
-            <SplashCursor />,
-            document.getElementById('App')
-        );
+        // Import the SplashCursor component
+        function App() {
+            React.useEffect(() => {
+                // Dynamically import the SplashCursor component
+                const script = document.createElement('script');
+                script.src = 'assets/js/SplashCursor.js';
+                script.type = 'text/babel';
+                script.async = true;
+                document.body.appendChild(script);
+                
+                return () => {
+                    document.body.removeChild(script);
+                };
+            }, []);
+            
+            return (
+                <div id="splash-cursor"></div>
+            );
+        }
+        
+        // Render the App component
+        const container = document.getElementById('cursor-container');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
     </script>
-    <!--  -->
 </body>
 </html>
