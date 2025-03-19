@@ -25,17 +25,9 @@ header {
 }
 
 .nav-favicon {
-    width: 32px;
-    height: 32px;
-    margin-right: 10px;
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.nav-favicon:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
 }
 
 /* Navigation styles */
