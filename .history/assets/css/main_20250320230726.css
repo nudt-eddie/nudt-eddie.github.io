@@ -83,7 +83,7 @@ header {
     background-color: transparent;
     color: white;
     padding: 10px 20px;
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     border: none;
     cursor: pointer;
     font-weight: 500;
@@ -195,6 +195,12 @@ header {
     top: -20px;
     left: 0;
     z-index: 0;
+}
+
+/* Active navigation item */
+.dropdown-content a.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    font-weight: bold;
 }
 
 /* Section styles */

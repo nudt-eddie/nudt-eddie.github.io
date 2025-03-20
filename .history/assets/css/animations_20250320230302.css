@@ -1,0 +1,106 @@
+/* Transition effects */
+.section .background {
+    transition: transform 0.5s ease-out;
+}
+
+.section .content {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 1s ease;
+}
+
+.section.active .content {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Header transition */
+.header-scrolled {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Navigation hover effects */
+.navbar a {
+    position: relative;
+    overflow: hidden;
+}
+
+.navbar a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #fff;
+    transition: width 0.3s ease;
+}
+
+.navbar a:hover::after {
+    width: 100%;
+}
+
+/* Content fade-in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 1s ease forwards;
+}
+
+/* Dynamic Art Text Animation */
+.dynamic-art-text {
+    display: inline-block;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    margin-left: 15px;
+    font-size: 1.1rem;
+}
+
+@keyframes glowText {
+    0% {
+        color: rgba(255, 255, 255, 0.8);
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+    }
+    50% {
+        color: #fff;
+        text-shadow: 0 0 15px rgba(255, 255, 255, 0.7), 0 0 20px rgba(255, 255, 255, 0.5);
+    }
+    100% {
+        color: rgba(255, 255, 255, 0.8);
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+    }
+}
+
+@keyframes floatText {
+    0% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.dynamic-art-text span {
+    display: inline-block;
+    animation: glowText 3s infinite, floatText 2s ease-in-out infinite;
+}
+
+.dynamic-art-text span:nth-child(1) { animation-delay: 0.0s; }
+.dynamic-art-text span:nth-child(2) { animation-delay: 0.1s; }
+.dynamic-art-text span:nth-child(3) { animation-delay: 0.2s; }
+.dynamic-art-text span:nth-child(4) { animation-delay: 0.3s; }
+.dynamic-art-text span:nth-child(5) { animation-delay: 0.4s; }
+.dynamic-art-text span:nth-child(6) { animation-delay: 0.5s; } 
