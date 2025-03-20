@@ -1,0 +1,18 @@
+# Video Backgrounds
+
+Add the following MP4 video files to this directory:
+
+1. `research_background.mp4` - For the research.html page
+2. `project_background.mp4` - For the project.html page
+3. `life_background.mp4` - For the life.html page
+
+## Video Requirements
+
+For optimal performance:
+- Format: MP4 (H.264 codec)
+- Resolution: 1920x1080 or higher (will scale down for mobile)
+- Duration: 10-30 seconds (videos will loop)
+- Size: Keep under 5MB if possible for faster loading
+- Ensure videos are relevant to each section content
+
+The videos should be visually subtle enough to not distract from the text content while adding visual interest to each page. 

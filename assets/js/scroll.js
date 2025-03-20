@@ -3,6 +3,14 @@ class ScrollHandler {
     constructor() {
         this.header = document.querySelector('header');
         this.sections = document.querySelectorAll('.section');
+        this.footer = document.querySelector('footer');
+        this.footerElements = this.footer ? {
+            headings: this.footer.querySelectorAll('.footer-heading'),
+            links: this.footer.querySelectorAll('.footer-links li'),
+            signature: this.footer.querySelector('.artist-signature'),
+            socialIcons: this.footer.querySelectorAll('.social-icon'),
+            copyright: this.footer.querySelector('.copyright')
+        } : null;
         this.init();
     }
 
@@ -10,7 +18,12 @@ class ScrollHandler {
         window.addEventListener('scroll', () => {
             this.handleHeaderScroll();
             this.handleSectionVisibility();
+            this.handleFooterVisibility();
         });
+        
+        // Initial check for elements in viewport
+        this.handleSectionVisibility();
+        this.handleFooterVisibility();
     }
 
     handleHeaderScroll() {
@@ -42,6 +55,51 @@ class ScrollHandler {
                 section.classList.remove('active');
             }
         });
+    }
+    
+    handleFooterVisibility() {
+        if (!this.footer) return;
+        
+        const footerTop = this.footer.getBoundingClientRect().top;
+        const windowHeight = window.innerHeight;
+        
+        // Check if footer is in viewport
+        if (footerTop < windowHeight * 0.9) {
+            this.footer.classList.add('visible');
+            
+            // Apply staggered animations to footer elements
+            if (this.footerElements) {
+                this.footerElements.headings.forEach((heading, index) => {
+                    setTimeout(() => {
+                        heading.classList.add('animate');
+                    }, index * 200);
+                });
+                
+                this.footerElements.links.forEach((link, index) => {
+                    setTimeout(() => {
+                        link.classList.add('animate');
+                    }, 300 + (index * 100));
+                });
+                
+                if (this.footerElements.signature) {
+                    setTimeout(() => {
+                        this.footerElements.signature.classList.add('animate');
+                    }, 800);
+                }
+                
+                this.footerElements.socialIcons.forEach((icon, index) => {
+                    setTimeout(() => {
+                        icon.classList.add('animate');
+                    }, 1000 + (index * 150));
+                });
+                
+                if (this.footerElements.copyright) {
+                    setTimeout(() => {
+                        this.footerElements.copyright.classList.add('animate');
+                    }, 1500);
+                }
+            }
+        }
     }
 }
 

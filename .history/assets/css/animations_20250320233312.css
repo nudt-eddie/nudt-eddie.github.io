@@ -1,0 +1,220 @@
+/* Transition effects */
+.section .background {
+    transition: transform 0.5s ease-out;
+}
+
+.section .content {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 1s ease;
+}
+
+.section.active .content {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Header transition */
+.header-scrolled {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Navigation hover effects */
+.navbar a {
+    position: relative;
+    overflow: hidden;
+}
+
+.navbar a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #fff;
+    transition: width 0.3s ease;
+}
+
+.navbar a:hover::after {
+    width: 100%;
+}
+
+/* Content fade-in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 1s ease forwards;
+}
+
+/* Artistic Logo Text Animation */
+.artistic-text {
+    display: inline-flex;
+    overflow: hidden;
+    font-weight: 700;
+}
+
+.artistic-text .letter {
+    display: inline-block;
+    position: relative;
+    transform-style: preserve-3d;
+    perspective: 500px;
+    transition: all 0.3s ease;
+}
+
+.letter:nth-child(1) { animation: float 3s ease-in-out infinite; }
+.letter:nth-child(2) { animation: float 3s ease-in-out 0.2s infinite; }
+.letter:nth-child(3) { animation: float 3s ease-in-out 0.4s infinite; }
+.letter:nth-child(4) { animation: float 3s ease-in-out 0.6s infinite; }
+.letter:nth-child(5) { animation: float 3s ease-in-out 0.8s infinite; }
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+        text-shadow: 0 5px 15px rgba(255, 255, 255, 0.4);
+    }
+    25% {
+        transform: translateY(-4px) rotate(2deg);
+        text-shadow: 0 15px 15px rgba(255, 255, 255, 0.2);
+    }
+    50% {
+        transform: translateY(0) rotate(0deg);
+        text-shadow: 0 5px 15px rgba(255, 255, 255, 0.4);
+    }
+    75% {
+        transform: translateY(4px) rotate(-2deg);
+        text-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+    }
+}
+
+.artistic-text:hover .letter {
+    animation-play-state: paused;
+}
+
+.artistic-text:hover .letter:nth-child(1) { transform: translateY(-6px) rotate(-8deg); color: #ff7e5f; }
+.artistic-text:hover .letter:nth-child(2) { transform: translateY(2px) rotate(5deg); color: #feb47b; }
+.artistic-text:hover .letter:nth-child(3) { transform: translateY(-4px) rotate(-4deg); color: #ffcb8f; }
+.artistic-text:hover .letter:nth-child(4) { transform: translateY(3px) rotate(7deg); color: #f9f871; }
+.artistic-text:hover .letter:nth-child(5) { transform: translateY(-5px) rotate(-6deg); color: #fdffac; }
+
+/* Text glow effect */
+.artistic-text .letter {
+    color: white;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+/* 3D text effect on hover */
+.artistic-text:hover .letter {
+    text-shadow: 
+        0 1px 0 #ccc,
+        0 2px 0 #c9c9c9,
+        0 3px 0 #bbb,
+        0 4px 0 #b9b9b9,
+        0 5px 0 #aaa,
+        0 6px 1px rgba(0,0,0,.1),
+        0 0 5px rgba(0,0,0,.1),
+        0 1px 3px rgba(0,0,0,.3),
+        0 3px 5px rgba(0,0,0,.2),
+        0 5px 10px rgba(0,0,0,.25),
+        0 10px 10px rgba(0,0,0,.2),
+        0 20px 20px rgba(0,0,0,.15);
+}
+
+/* Footer animations */
+@keyframes signatureFloat {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+        text-shadow: 0 5px 15px rgba(255, 255, 255, 0.4);
+    }
+    25% {
+        transform: translateY(-3px) rotate(1deg);
+        text-shadow: 0 12px 15px rgba(255, 255, 255, 0.2);
+    }
+    50% {
+        transform: translateY(0) rotate(0deg);
+        text-shadow: 0 5px 15px rgba(255, 255, 255, 0.4);
+    }
+    75% {
+        transform: translateY(3px) rotate(-1deg);
+        text-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+    }
+}
+
+.signature-text .letter:nth-child(1) { animation: signatureFloat 4s ease-in-out infinite; }
+.signature-text .letter:nth-child(2) { animation: signatureFloat 4s ease-in-out 0.2s infinite; }
+.signature-text .letter:nth-child(3) { animation: signatureFloat 4s ease-in-out 0.4s infinite; }
+.signature-text .letter:nth-child(4) { animation: signatureFloat 4s ease-in-out 0.6s infinite; }
+.signature-text .letter:nth-child(5) { animation: signatureFloat 4s ease-in-out 0.8s infinite; }
+
+.signature-text:hover .letter {
+    animation-play-state: paused;
+}
+
+@keyframes iconPulse {
+    0%, 100% {
+        opacity: 0.7;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
+}
+
+.social-icon {
+    animation: iconPulse 3s ease-in-out infinite;
+}
+
+.social-icon:nth-child(1) { animation-delay: 0s; }
+.social-icon:nth-child(2) { animation-delay: 0.6s; }
+.social-icon:nth-child(3) { animation-delay: 1.2s; }
+.social-icon:nth-child(4) { animation-delay: 1.8s; }
+.social-icon:nth-child(5) { animation-delay: 2.4s; }
+
+.social-icon:hover {
+    animation-play-state: paused;
+}
+
+.footer-heading {
+    animation: fadeIn 1s ease forwards;
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.footer-section:nth-child(1) .footer-heading { animation-delay: 0.1s; }
+.footer-section:nth-child(2) .footer-heading { animation-delay: 0.3s; }
+.footer-section:nth-child(3) .footer-heading { animation-delay: 0.5s; }
+
+.footer-links li {
+    opacity: 0;
+    transform: translateX(-10px);
+    animation: fadeIn 0.5s ease forwards;
+}
+
+.footer-section:nth-child(1) .footer-links li:nth-child(1) { animation-delay: 0.2s; }
+.footer-section:nth-child(1) .footer-links li:nth-child(2) { animation-delay: 0.3s; }
+.footer-section:nth-child(1) .footer-links li:nth-child(3) { animation-delay: 0.4s; }
+
+.footer-section:nth-child(2) .footer-links li:nth-child(1) { animation-delay: 0.4s; }
+.footer-section:nth-child(2) .footer-links li:nth-child(2) { animation-delay: 0.5s; }
+.footer-section:nth-child(2) .footer-links li:nth-child(3) { animation-delay: 0.6s; }
+
+.footer-section:nth-child(3) .footer-links li:nth-child(1) { animation-delay: 0.6s; }
+.footer-section:nth-child(3) .footer-links li:nth-child(2) { animation-delay: 0.7s; }
+.footer-section:nth-child(3) .footer-links li:nth-child(3) { animation-delay: 0.8s; }
+
+.copyright {
+    animation: fadeIn 1s ease forwards;
+    animation-delay: 1s;
+    opacity: 0;
+} 
