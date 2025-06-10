@@ -567,21 +567,6 @@ footer::before {
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
-/* Research Directory Styles */
-.research-directory {
-    margin-top: 3rem;
-    padding: 2rem 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.research-directory h3 {
-    font-size: 1.8rem;
-    margin-bottom: 2rem;
-    text-align: center;
-    color: #fff;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-}
-
 
 /* Life Directory Styles */
 .life-directory {
