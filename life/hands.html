@@ -2,7 +2,14 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>手部完整映射到屏幕</title>
+    <title>手部追踪演示</title>
+    <link rel="icon" type="image/x-icon" href="../assets/images/favicon.ico">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="../assets/css/reset.css">
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <link rel="stylesheet" href="../assets/css/animations.css">
+
     <style>
         * {
             margin: 0;
@@ -50,6 +57,16 @@
             z-index: 10;
         }
         
+        #gesture-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            pointer-events: none;
+        }
+        
         #stats {
             position: absolute;
             bottom: 20px;
@@ -73,6 +90,60 @@
             line-height: 1.6;
             max-width: 300px;
             z-index: 100;
+        }
+        
+        #toolbar {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        .toolbar-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .toolbar-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .btn-screenshot {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-json {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-csv {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .btn-screenshot:hover {
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+        }
+        
+        .btn-json:hover {
+            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.5);
+        }
+        
+        .btn-csv:hover {
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.5);
         }
         
         .hand-point {
@@ -164,15 +235,55 @@
             background: rgba(100, 100, 255, 0.6) !important;
             border-color: rgba(150, 150, 255, 0.9) !important;
         }
+        
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            z-index: 2000;
+            animation: fadeInOut 2s ease-in-out;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+        
+        /* 手势特效样式 */
+        .gesture-effect {
+            position: absolute;
+            pointer-events: none;
+            z-index: 200;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 </head>
 <body>
+    <a href="../index.html" class="logo">
+        <img src="../assets/images/favicon.ico" alt="favicon" class="nav-favicon">
+        <span class="artistic-text">
+            <span class="letter">E</span>
+            <span class="letter">d</span>
+            <span class="letter">d</span>
+            <span class="letter">i</span>
+            <span class="letter">e</span>
+        </span>
+    </a>
     <div id="container">
         <div id="instructions">
             <h3>🎮 手部映射demo</h3>
             <p><strong>按 D 键切换调试信息</strong></p>
+            <p><strong>按 R 键重置</strong></p>
         </div>
 
         <div id="video-container">
@@ -187,9 +298,22 @@
             <div>当前手势: <span id="current-gesture">-</span></div>
         </div>
         
+        <div id="toolbar">
+            <button class="toolbar-btn btn-screenshot" onclick="captureScreenshot()">
+                📷 截图保存
+            </button>
+            <button class="toolbar-btn btn-json" onclick="exportJSON()">
+                📄 导出关键点数据 (JSON)
+            </button>
+            <button class="toolbar-btn btn-csv" onclick="exportCSV()">
+                📊 导出关键点数据 (CSV)
+            </button>
+        </div>
+        
         <div class="debug-info" id="debug-info"></div>
         
         <canvas id="canvas"></canvas>
+        <canvas id="gesture-canvas"></canvas>
     </div>
 
     <script>
@@ -197,10 +321,14 @@
         let videoElement;
         let canvas;
         let ctx;
+        let gestureCanvas;
+        let gestureCtx;
         let hands;
         let cameraUtils;
         let handElements = {};
         let debugMode = true;
+        let currentHandData = null; // 存储当前帧的手部数据
+        let gestureEffects = []; // 存储手势特效
 
         // 手部关键点连接关系
         const HAND_CONNECTIONS = [
@@ -213,12 +341,34 @@
         ];
 
         const LANDMARK_NAMES = [
-            '手腕', '拇指根', '拇指中', '拇指尖',
-            '食指根', '食指中', '食指尖',
-            '中指根', '中指中', '中指尖',
-            '无名指根', '无名指中', '无名指尖',
-            '小指根', '小指中', '小指尖'
+            'WRIST', 'THUMB_CMC', 'THUMB_MCP', 'THUMB_IP', 'THUMB_TIP',
+            'INDEX_FINGER_MCP', 'INDEX_FINGER_PIP', 'INDEX_FINGER_DIP', 'INDEX_FINGER_TIP',
+            'MIDDLE_FINGER_MCP', 'MIDDLE_FINGER_PIP', 'MIDDLE_FINGER_DIP', 'MIDDLE_FINGER_TIP',
+            'RING_FINGER_MCP', 'RING_FINGER_PIP', 'RING_FINGER_DIP', 'RING_FINGER_TIP',
+            'PINKY_MCP', 'PINKY_PIP', 'PINKY_DIP', 'PINKY_TIP'
         ];
+
+        const LANDMARK_NAMES_CN = [
+            '手腕', '拇指腕掌关节', '拇指掌指关节', '拇指指间关节', '拇指尖',
+            '食指掌指关节', '食指近端指间关节', '食指远端指间关节', '食指尖',
+            '中指掌指关节', '中指近端指间关节', '中指远端指间关节', '中指尖',
+            '无名指掌指关节', '无名指近端指间关节', '无名指远端指间关节', '无名指尖',
+            '小指掌指关节', '小指近端指间关节', '小指远端指间关节', '小指尖'
+        ];
+
+        // 手势图标和颜色配置
+        const GESTURE_CONFIG = {
+            '手掌张开': { icon: '✋', color: '#00ff88', particles: true, glow: true },
+            '握拳': { icon: '✊', color: '#ff4444', particles: false, glow: true },
+            '剪刀手': { icon: '✌️', color: '#ffff00', particles: true, glow: true },
+            '竖大拇指': { icon: '👍', color: '#00aaff', particles: true, glow: true },
+            '指向': { icon: '👆', color: '#ff88ff', particles: false, glow: true },
+            '2指伸出': { icon: '2️⃣', color: '#88ffff', particles: false, glow: false },
+            '3指伸出': { icon: '3️⃣', color: '#88ff88', particles: false, glow: false },
+            '4指伸出': { icon: '4️⃣', color: '#ffaa88', particles: false, glow: false },
+            'OK手势': { icon: '👌', color: '#ff00ff', particles: true, glow: true },
+            '摇滚': { icon: '🤘', color: '#ff6600', particles: true, glow: true }
+        };
 
         // 初始化
         document.addEventListener('DOMContentLoaded', init);
@@ -227,16 +377,23 @@
             videoElement = document.getElementById('input-video');
             canvas = document.getElementById('canvas');
             ctx = canvas.getContext('2d');
+            gestureCanvas = document.getElementById('gesture-canvas');
+            gestureCtx = gestureCanvas.getContext('2d');
             
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
             setupHandTracking();
+            
+            // 启动特效动画循环
+            requestAnimationFrame(animateGestureEffects);
         }
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            gestureCanvas.width = window.innerWidth;
+            gestureCanvas.height = window.innerHeight;
         }
 
         function setupHandTracking() {
@@ -277,6 +434,14 @@
             let leftHandData = null;
             let rightHandData = null;
             
+            // 存储当前帧数据用于导出
+            currentHandData = {
+                timestamp: new Date().toISOString(),
+                screenWidth: canvas.width,
+                screenHeight: canvas.height,
+                hands: []
+            };
+            
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 results.multiHandLandmarks.forEach((landmarks, index) => {
                     const handedness = results.multiHandedness[index];
@@ -286,11 +451,31 @@
                     
                     const actualHandedness = isLeftHand ? 'Left' : 'Right';
                     
+                    // 存储手部数据
+                    const handInfo = {
+                        handedness: actualHandedness,
+                        confidence: handedness.score,
+                        landmarks: landmarks.map((lm, i) => ({
+                            index: i,
+                            name: LANDMARK_NAMES[i],
+                            nameCN: LANDMARK_NAMES_CN[i],
+                            x: lm.x,
+                            y: lm.y,
+                            z: lm.z,
+                            screenX: (1 - lm.x) * canvas.width,
+                            screenY: lm.y * canvas.height
+                        }))
+                    };
+                    
                     if (isLeftHand) {
                         leftHandData = { landmarks, handedness: actualHandedness };
+                        handInfo.gesture = analyzeGesture(landmarks, 'Left');
                     } else if (isRightHand) {
                         rightHandData = { landmarks, handedness: actualHandedness };
+                        handInfo.gesture = analyzeGesture(landmarks, 'Right');
                     }
+                    
+                    currentHandData.hands.push(handInfo);
                     
                     drawHandToScreen(landmarks, actualHandedness, index);
                 });
@@ -340,7 +525,9 @@
             
             // 分析手势
             const gesture = analyzeGesture(landmarks, handedness);
-            drawGestureLabel(screenCenterX, screenCenterY - 40, gesture, handedness);
+            
+            // 使用增强的手势渲染
+            renderGestureEnhanced(screenCenterX, screenCenterY, gesture, handedness, landmarks);
             
             return gesture;
         }
@@ -435,51 +622,307 @@
             }
         }
 
-        function drawGestureLabel(x, y, gesture, handedness) {
+        // 增强的手势渲染方法
+        function renderGestureEnhanced(x, y, gesture, handedness, landmarks) {
+            const config = GESTURE_CONFIG[gesture] || { icon: '🖐️', color: '#ffffff', particles: false, glow: false };
+            
+            // 绘制发光效果
+            if (config.glow) {
+                drawGlowEffect(x, y - 60, config.color);
+            }
+            
+            // 绘制手势图标和文字
+            drawGestureIconAndText(x, y - 60, gesture, config, handedness);
+            
+            // 添加粒子效果
+            if (config.particles) {
+                addParticleEffect(x, y - 60, config.color);
+            }
+            
+            // 特殊手势的额外效果
+            renderSpecialGestureEffects(gesture, landmarks, handedness, config.color);
+        }
+
+        function drawGlowEffect(x, y, color) {
+            ctx.save();
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            ctx.arc(x, y, 40, 0, Math.PI * 2);
+            ctx.fillStyle = color + '33'; // 添加透明度
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawGestureIconAndText(x, y, gesture, config, handedness) {
             // 绘制背景
             const text = handedness === 'Left' ? `左手: ${gesture}` : `右手: ${gesture}`;
+            ctx.font = 'bold 16px Arial';
             const textWidth = ctx.measureText(text).width;
             
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(x - textWidth/2 - 10, y - 15, textWidth + 20, 30);
+            // 渐变背景
+            const gradient = ctx.createLinearGradient(x - textWidth/2 - 30, y - 20, x + textWidth/2 + 30, y + 20);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(30, 30, 30, 0.9)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
             
-            // 绘制文字
-            ctx.fillStyle = handedness === 'Left' ? 
-                'rgba(255, 200, 200, 1)' : 'rgba(200, 200, 255, 1)';
-            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(x - textWidth/2 - 35, y - 25, textWidth + 70, 50, 10);
+            ctx.fill();
+            
+            // 绘制边框
+            ctx.strokeStyle = config.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制图标
+            ctx.font = '24px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(text, x, y);
+            ctx.fillText(config.icon, x - textWidth/2 - 15, y);
+            
+            // 绘制文字
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = config.color;
+            ctx.fillText(text, x + 15, y);
+        }
+
+        function addParticleEffect(x, y, color) {
+            // 添加粒子到效果数组
+            for (let i = 0; i < 3; i++) {
+                gestureEffects.push({
+                    type: 'particle',
+                    x: x + (Math.random() - 0.5) * 60,
+                    y: y + (Math.random() - 0.5) * 40,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: -Math.random() * 3 - 1,
+                    size: Math.random() * 6 + 2,
+                    color: color,
+                    life: 1,
+                    decay: 0.02 + Math.random() * 0.02
+                });
+            }
+        }
+
+        function renderSpecialGestureEffects(gesture, landmarks, handedness, color) {
+            // 反转X坐标的辅助函数
+            const getScreenX = (lm) => (1 - lm.x) * canvas.width;
+            const getScreenY = (lm) => lm.y * canvas.height;
+            
+            switch(gesture) {
+                case '指向':
+                    // 绘制指向射线
+                    const indexTip = landmarks[8];
+                    const indexPip = landmarks[6];
+                    const dirX = getScreenX(indexTip) - getScreenX(indexPip);
+                    const dirY = getScreenY(indexTip) - getScreenY(indexPip);
+                    const length = Math.sqrt(dirX * dirX + dirY * dirY);
+                    const normX = dirX / length;
+                    const normY = dirY / length;
+                    
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(getScreenX(indexTip), getScreenY(indexTip));
+                    ctx.lineTo(
+                        getScreenX(indexTip) + normX * 200,
+                        getScreenY(indexTip) + normY * 200
+                    );
+                    ctx.stroke();
+                    ctx.restore();
+                    break;
+                    
+                case '剪刀手':
+                    // 绘制V字光效
+                    const index8 = landmarks[8];
+                    const middle12 = landmarks[12];
+                    
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 4;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = color;
+                    ctx.beginPath();
+                    ctx.moveTo(getScreenX(index8), getScreenY(index8));
+                    ctx.lineTo(getScreenX(index8) - 20, getScreenY(index8) - 40);
+                    ctx.moveTo(getScreenX(middle12), getScreenY(middle12));
+                    ctx.lineTo(getScreenX(middle12) + 20, getScreenY(middle12) - 40);
+                    ctx.stroke();
+                    ctx.restore();
+                    break;
+                    
+                case '竖大拇指':
+                    // 绘制光芒效果
+                    const thumbTip = landmarks[4];
+                    const tx = getScreenX(thumbTip);
+                    const ty = getScreenY(thumbTip);
+                    
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(tx + Math.cos(angle) * 15, ty + Math.sin(angle) * 15);
+                        ctx.lineTo(tx + Math.cos(angle) * 30, ty + Math.sin(angle) * 30);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                    break;
+                    
+                case 'OK手势':
+                    // 绘制圆环效果
+                    const thumb4 = landmarks[4];
+                    const index8ok = landmarks[8];
+                    const okX = (getScreenX(thumb4) + getScreenX(index8ok)) / 2;
+                    const okY = (getScreenY(thumb4) + getScreenY(index8ok)) / 2;
+                    
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = color;
+                    ctx.beginPath();
+                    ctx.arc(okX, okY, 25, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                    break;
+                    
+                case '摇滚':
+                    // 绘制闪电效果
+                    const rockIndex = landmarks[8];
+                    const rockPinky = landmarks[20];
+                    
+                    ctx.save();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = color;
+                    
+                    // 闪电在食指上方
+                    drawLightning(getScreenX(rockIndex), getScreenY(rockIndex) - 50, 30);
+                    // 闪电在小指上方
+                    drawLightning(getScreenX(rockPinky), getScreenY(rockPinky) - 50, 30);
+                    
+                    ctx.restore();
+                    break;
+            }
+        }
+
+        function drawLightning(x, y, size) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - size * 0.3, y + size * 0.4);
+            ctx.lineTo(x + size * 0.1, y + size * 0.4);
+            ctx.lineTo(x - size * 0.2, y + size);
+            ctx.lineTo(x + size * 0.2, y + size * 0.5);
+            ctx.lineTo(x - size * 0.1, y + size * 0.5);
+            ctx.lineTo(x + size * 0.3, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function animateGestureEffects() {
+            gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+            
+            // 更新和绘制粒子
+            gestureEffects = gestureEffects.filter(effect => {
+                if (effect.type === 'particle') {
+                    effect.x += effect.vx;
+                    effect.y += effect.vy;
+                    effect.life -= effect.decay;
+                    
+                    if (effect.life > 0) {
+                        gestureCtx.save();
+                        gestureCtx.globalAlpha = effect.life;
+                        gestureCtx.fillStyle = effect.color;
+                        gestureCtx.beginPath();
+                        gestureCtx.arc(effect.x, effect.y, effect.size * effect.life, 0, Math.PI * 2);
+                        gestureCtx.fill();
+                        gestureCtx.restore();
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            requestAnimationFrame(animateGestureEffects);
         }
 
         function analyzeGesture(landmarks, handedness) {
             const fingerTips = [4, 8, 12, 16, 20];
             const fingerPips = [2, 6, 10, 14, 18];
+            const fingerMcps = [1, 5, 9, 13, 17];
             
-            let extendedCount = 0;
+            let extendedFingers = [];
             
+            // 检查每个手指是否伸展
             for (let i = 0; i < 5; i++) {
                 const tipY = landmarks[fingerTips[i]].y;
                 const pipY = landmarks[fingerPips[i]].y;
+                const mcpY = landmarks[fingerMcps[i]].y;
                 
-                if (tipY < pipY - 0.02) {
-                    extendedCount++;
+                if (i === 0) {
+                    // 拇指特殊处理：检查是否向外伸展
+                    const thumbTip = landmarks[4];
+                    const thumbMcp = landmarks[2];
+                    const indexMcp = landmarks[5];
+                    
+                    // 计算拇指是否伸展（相对于食指根部的位置）
+                    const thumbExtended = Math.abs(thumbTip.x - indexMcp.x) > 0.1;
+                    extendedFingers.push(thumbExtended);
+                } else {
+                    extendedFingers.push(tipY < pipY - 0.02);
                 }
+            }
+            
+            const extendedCount = extendedFingers.filter(e => e).length;
+            
+            // 检查OK手势（拇指和食指形成圆圈）
+            const thumb4 = landmarks[4];
+            const index8 = landmarks[8];
+            const distance = Math.sqrt(
+                Math.pow(thumb4.x - index8.x, 2) + 
+                Math.pow(thumb4.y - index8.y, 2)
+            );
+            if (distance < 0.05 && extendedFingers[2] && extendedFingers[3] && extendedFingers[4]) {
+                return 'OK手势';
+            }
+            
+            // 检查摇滚手势（食指和小指伸展，中指和无名指弯曲）
+            if (extendedFingers[1] && !extendedFingers[2] && !extendedFingers[3] && extendedFingers[4]) {
+                return '摇滚';
+            }
+            
+            // 检查竖大拇指（只有拇指伸展且向上）
+            if (extendedFingers[0] && !extendedFingers[1] && !extendedFingers[2] && 
+                !extendedFingers[3] && !extendedFingers[4]) {
+                const thumbTip = landmarks[4];
+                const wrist = landmarks[0];
+                if (thumbTip.y < wrist.y - 0.1) {
+                    return '竖大拇指';
+                }
+            }
+            
+            // 检查指向（只有食指伸展）
+            if (!extendedFingers[0] && extendedFingers[1] && !extendedFingers[2] && 
+                !extendedFingers[3] && !extendedFingers[4]) {
+                return '指向';
             }
             
             // 手势判断
             if (extendedCount >= 4) {
                 return '手掌张开';
-            } else if (extendedCount <= 1) {
+            } else if (extendedCount <= 1 && !extendedFingers[0]) {
                 return '握拳';
             } else if (extendedCount === 2) {
                 // 检查剪刀手
-                const indexExtended = landmarks[8].y < landmarks[6].y - 0.02;
-                const middleExtended = landmarks[12].y < landmarks[10].y - 0.02;
-                const othersNotExtended = !(landmarks[16].y < landmarks[14].y - 0.02) && 
-                                         !(landmarks[20].y < landmarks[18].y - 0.02);
-                
-                if (indexExtended && middleExtended && othersNotExtended) {
+                if (extendedFingers[1] && extendedFingers[2] && 
+                    !extendedFingers[3] && !extendedFingers[4]) {
                     return '剪刀手';
                 }
                 return '2指伸出';
@@ -576,6 +1019,115 @@
             statusEl.style.color = color;
         }
 
+        // ============ 导出功能 ============
+
+        // 截图保存
+        function captureScreenshot() {
+            // 创建一个新的canvas来合并所有图层
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvas.width;
+            exportCanvas.height = canvas.height;
+            const exportCtx = exportCanvas.getContext('2d');
+            
+            // 绘制黑色背景
+            exportCtx.fillStyle = '#000';
+            exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            // 绘制主画布内容
+            exportCtx.drawImage(canvas, 0, 0);
+            
+            // 绘制手势特效画布
+            exportCtx.drawImage(gestureCanvas, 0, 0);
+            
+            // 添加时间戳水印
+            const timestamp = new Date().toLocaleString('zh-CN');
+            exportCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            exportCtx.font = '14px Arial';
+            exportCtx.textAlign = 'right';
+            exportCtx.fillText(`截图时间: ${timestamp}`, exportCanvas.width - 20, exportCanvas.height - 20);
+            
+            // 创建下载链接
+            const link = document.createElement('a');
+            const filename = `hand_tracking_${Date.now()}.png`;
+            link.download = filename;
+            link.href = exportCanvas.toDataURL('image/png');
+            link.click();
+            
+            showNotification(`📷 截图已保存: ${filename}`);
+        }
+
+        // 导出JSON
+        function exportJSON() {
+            if (!currentHandData || currentHandData.hands.length === 0) {
+                showNotification('⚠️ 当前没有检测到手部数据');
+                return;
+            }
+            
+            const jsonStr = JSON.stringify(currentHandData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const link = document.createElement('a');
+            const filename = `hand_landmarks_${Date.now()}.json`;
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
+            
+            showNotification(`📄 JSON数据已导出: ${filename}`);
+        }
+
+        // 导出CSV
+        function exportCSV() {
+            if (!currentHandData || currentHandData.hands.length === 0) {
+                showNotification('⚠️ 当前没有检测到手部数据');
+                return;
+            }
+            
+            // CSV头部
+            let csvContent = 'Timestamp,Hand,Gesture,Confidence,LandmarkIndex,LandmarkName,LandmarkNameCN,X,Y,Z,ScreenX,ScreenY\n';
+            
+            // 添加数据行
+            currentHandData.hands.forEach(hand => {
+                hand.landmarks.forEach(lm => {
+                    csvContent += `${currentHandData.timestamp},`;
+                    csvContent += `${hand.handedness},`;
+                    csvContent += `${hand.gesture},`;
+                    csvContent += `${hand.confidence.toFixed(4)},`;
+                    csvContent += `${lm.index},`;
+                    csvContent += `${lm.name},`;
+                    csvContent += `${lm.nameCN},`;
+                    csvContent += `${lm.x.toFixed(6)},`;
+                    csvContent += `${lm.y.toFixed(6)},`;
+                    csvContent += `${lm.z.toFixed(6)},`;
+                    csvContent += `${lm.screenX.toFixed(2)},`;
+                    csvContent += `${lm.screenY.toFixed(2)}\n`;
+                });
+            });
+            
+            // 添加BOM以支持中文
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
+            const link = document.createElement('a');
+            const filename = `hand_landmarks_${Date.now()}.csv`;
+            link.download = filename;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
+            
+            showNotification(`📊 CSV数据已导出: ${filename}`);
+        }
+
+        // 显示通知
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+
         // 键盘控制
         document.addEventListener('keydown', (e) => {
             if (e.key === 'd' || e.key === 'D') {
@@ -587,7 +1139,19 @@
                 // 重新开始
                 clearHandElements();
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+                gestureEffects = [];
                 updateStatus('重新检测中...', '#ff0');
+            }
+            // 快捷键
+            if (e.key === 's' || e.key === 'S') {
+                captureScreenshot();
+            }
+            if (e.key === 'j' || e.key === 'J') {
+                exportJSON();
+            }
+            if (e.key === 'c' || e.key === 'C') {
+                exportCSV();
             }
         });
     </script>

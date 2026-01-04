@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="../assets/images/favicon.ico">
+    <!-- CSS -->
+    <link rel="stylesheet" href="../assets/css/reset.css">
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <link rel="stylesheet" href="../assets/css/animations.css">
+    <title>面部追踪器 | Face Tracker</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-cyan: #00f5ff;
+            --primary-magenta: #ff00ff;
+            --primary-yellow: #ffff00;
+            --bg-dark: #0a0a12;
+            --bg-darker: #050508;
+            --glass-bg: rgba(10, 10, 18, 0.85);
+            --border-glow: rgba(0, 245, 255, 0.3);
+        }
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: #fff;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* 动态网格背景 */
+        .grid-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(40px, 40px); }
+        }
+        
+        /* 扫描线效果 */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.1) 2px,
+                rgba(0, 0, 0, 0.1) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        /* 主视频容器 */
+        .main-view {
+            position: relative;
+            width: 900px;
+            height: 680px;
+            background: var(--bg-darker);
+            border: 2px solid var(--border-glow);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 
+                0 0 60px rgba(0, 245, 255, 0.15),
+                inset 0 0 100px rgba(0, 0, 0, 0.5);
+        }
+        
+        .main-view::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, var(--primary-cyan), var(--primary-magenta), var(--primary-yellow));
+            border-radius: 22px;
+            z-index: -1;
+            opacity: 0.5;
+            filter: blur(15px);
+            animation: borderGlow 4s ease-in-out infinite alternate;
+        }
+        
+        @keyframes borderGlow {
+            0% { opacity: 0.3; }
+            100% { opacity: 0.7; }
+        }
+        
+        #videoElement {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            opacity: 0;
+        }
+        
+        #mainCanvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #overlayCanvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+        
+        /* 顶部状态栏 */
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--glass-bg);
+            padding: 12px 25px;
+            border-radius: 50px;
+            border: 1px solid var(--border-glow);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff3333;
+            box-shadow: 0 0 10px #ff3333;
+            transition: all 0.3s ease;
+        }
+        
+        .status-dot.active {
+            background: #00ff88;
+            box-shadow: 0 0 15px #00ff88;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        
+        .status-text {
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        /* 侧边面板 */
+        .side-panel {
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 50;
+        }
+        
+        .panel-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-glow);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(15px);
+        }
+        
+        .panel-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            letter-spacing: 3px;
+            color: var(--primary-cyan);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-title::before {
+            content: '';
+            width: 20px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary-cyan), transparent);
+        }
+        
+        /* 表情显示 */
+        .expression-display {
+            text-align: center;
+        }
+        
+        .expression-emoji {
+            font-size: 60px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+            animation: floatEmoji 3s ease-in-out infinite;
+        }
+        
+        @keyframes floatEmoji {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .expression-name {
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .expression-confidence {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-cyan);
+        }
+        
+        /* 数据指标 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .metric-item {
+            background: rgba(0, 245, 255, 0.05);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-cyan);
+        }
+        
+        .metric-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+        
+        /* 控制按钮 */
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+        
+        .control-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-glow);
+            color: #fff;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-btn:hover {
+            background: rgba(0, 245, 255, 0.2);
+            border-color: var(--primary-cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 245, 255, 0.2);
+        }
+        
+        .control-btn.active {
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.3), rgba(255, 0, 255, 0.3));
+            border-color: var(--primary-magenta);
+        }
+        
+        /* 左侧信息面板 */
+        .info-panel {
+            position: absolute;
+            left: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 260px;
+            z-index: 50;
+        }
+        
+        .landmark-count {
+            font-family: 'Orbitron', monospace;
+            font-size: 48px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary-cyan), var(--primary-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+        
+        .landmark-label {
+            font-size: 12px;
+            letter-spacing: 3px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+        
+        /* 头像预览 */
+        .avatar-preview {
+            margin-top: 25px;
+        }
+        
+        #avatarCanvas {
+            width: 100%;
+            height: 180px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 1px solid rgba(0, 245, 255, 0.2);
+        }
+        
+        /* 渲染模式切换 */
+        .render-modes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .mode-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.6);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .mode-btn:hover {
+            border-color: var(--primary-cyan);
+            color: var(--primary-cyan);
+        }
+        
+        .mode-btn.active {
+            background: var(--primary-cyan);
+            border-color: var(--primary-cyan);
+            color: var(--bg-dark);
+        }
+        
+        /* 加载动画 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-darker);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: opacity 0.5s ease;
+        }
+        
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-spinner {
+            width: 80px;
+            height: 80px;
+            border: 3px solid transparent;
+            border-top-color: var(--primary-cyan);
+            border-right-color: var(--primary-magenta);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            letter-spacing: 4px;
+            margin-top: 25px;
+            color: var(--primary-cyan);
+            animation: blink 1s ease-in-out infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 角落装饰 */
+        .corner-decor {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border: 2px solid var(--primary-cyan);
+            opacity: 0.5;
+        }
+        
+        .corner-decor.top-left {
+            top: 15px;
+            left: 15px;
+            border-right: none;
+            border-bottom: none;
+        }
+        
+        .corner-decor.top-right {
+            top: 15px;
+            right: 15px;
+            border-left: none;
+            border-bottom: none;
+        }
+        
+        .corner-decor.bottom-left {
+            bottom: 15px;
+            left: 15px;
+            border-right: none;
+            border-top: none;
+        }
+        
+        .corner-decor.bottom-right {
+            bottom: 15px;
+            right: 15px;
+            border-left: none;
+            border-top: none;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 1400px) {
+            .side-panel, .info-panel {
+                display: none;
+            }
+            .main-view {
+                width: 95vw;
+                height: 70vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="../index.html" class="logo">
+            <img src="../assets/images/favicon.ico" alt="favicon" class="nav-favicon">
+            <span class="artistic-text">
+                <span class="letter">E</span>
+                <span class="letter">d</span>
+                <span class="letter">d</span>
+                <span class="letter">i</span>
+                <span class="letter">e</span>
+            </span>
+        </a>
+        <div class="dropdown center-menu">
+            <button class="dropbtn">Menu</button>
+            <div class="dropdown-content">
+                <a href="../research.html">My Research</a>
+                <a href="../project.html">My Project</a>
+                <a href="../life.html">My Life</a>
+            </div>
+        </div>
+        <nav class="navbar">
+            <a href="../index.html#Past">Past</a>
+            <a href="../index.html#Present">Present</a>
+            <a href="../index.html#Future">Future</a>
+        </nav>
+    </header>
+
+    <div id="container">
+        <div class="grid-bg"></div>
+        <div class="scanlines"></div>
+        
+        <!-- 左侧信息面板 -->
+        <div class="info-panel">
+            <div class="panel-card">
+                <div class="panel-title">面部网格数据</div>
+                <div class="landmark-count" id="landmarkCount">0</div>
+                <div class="landmark-label">检测到的关键点</div>
+                
+                <div class="avatar-preview">
+                    <div class="panel-title">虚拟头像</div>
+                    <canvas id="avatarCanvas"></canvas>
+                </div>
+                
+                <div class="render-modes">
+                    <button class="mode-btn active" data-mode="mesh">网格</button>
+                    <button class="mode-btn" data-mode="points">点阵</button>
+                    <button class="mode-btn" data-mode="contour">轮廓</button>
+                    <button class="mode-btn" data-mode="heatmap">热力图</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 主视频区域 -->
+        <div class="main-view">
+            <div class="corner-decor top-left"></div>
+            <div class="corner-decor top-right"></div>
+            <div class="corner-decor bottom-left"></div>
+            <div class="corner-decor bottom-right"></div>
+            
+            <video id="videoElement" autoplay playsinline></video>
+            <canvas id="mainCanvas"></canvas>
+            <canvas id="overlayCanvas"></canvas>
+            
+            <div class="status-bar">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">初始化中...</span>
+            </div>
+            
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">正在加载面部识别模型</div>
+            </div>
+        </div>
+        
+        <!-- 右侧面板 -->
+        <div class="side-panel">
+            <div class="panel-card expression-display">
+                <div class="panel-title">当前表情</div>
+                <div class="expression-emoji" id="expressionEmoji">😐</div>
+                <div class="expression-name" id="expressionName">中性</div>
+                <div class="expression-confidence" id="expressionConfidence">0%</div>
+            </div>
+            
+            <div class="panel-card">
+                <div class="panel-title">面部指标</div>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="mouthOpenness">0</div>
+                        <div class="metric-label">嘴巴张度</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="eyeOpenness">0</div>
+                        <div class="metric-label">眼睛张度</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="browRaise">0</div>
+                        <div class="metric-label">眉毛高度</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="headTilt">0°</div>
+                        <div class="metric-label">头部倾斜</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部控制 -->
+        <div class="controls">
+            <button class="control-btn" id="toggleCamera">
+                <span>📷</span> 切换摄像头
+            </button>
+            <button class="control-btn" id="toggleVideo">
+                <span>🎬</span> 显示视频
+            </button>
+            <button class="control-btn" id="captureBtn">
+                <span>📸</span> 截图保存
+            </button>
+            <button class="control-btn" id="exportBtn">
+                <span>💾</span> 导出数据
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+    <script>
+        // 配置
+        const CONFIG = {
+            scaleFactor: 1.0,
+            pointSize: 2,
+            lineWidth: 1,
+            showMesh: true,
+            showPoints: false,
+            showContour: false,
+            showHeatmap: false,
+            videoOpacity: 0
+        };
+        
+        // 表情定义
+        const EXPRESSIONS = {
+            neutral: { name: '中性', emoji: '😐', color: '#888888' },
+            happy: { name: '开心', emoji: '😄', color: '#ffd700' },
+            sad: { name: '悲伤', emoji: '😢', color: '#4169e1' },
+            angry: { name: '生气', emoji: '😠', color: '#ff4500' },
+            surprised: { name: '惊讶', emoji: '😲', color: '#ff69b4' },
+            fearful: { name: '恐惧', emoji: '😨', color: '#9932cc' }
+        };
+        
+        // 面部网格连接（简化版）
+        const FACE_MESH_CONNECTIONS = {
+            // 面部轮廓
+            silhouette: [
+                [10, 338], [338, 297], [297, 332], [332, 284], [284, 251], [251, 389],
+                [389, 356], [356, 454], [454, 323], [323, 361], [361, 288], [288, 397],
+                [397, 365], [365, 379], [379, 378], [378, 400], [400, 377], [377, 152],
+                [152, 148], [148, 176], [176, 149], [149, 150], [150, 136], [136, 172],
+                [172, 58], [58, 132], [132, 93], [93, 234], [234, 127], [127, 162],
+                [162, 21], [21, 54], [54, 103], [103, 67], [67, 109], [109, 10]
+            ],
+            // 左眼
+            leftEye: [
+                [33, 7], [7, 163], [163, 144], [144, 145], [145, 153], [153, 154],
+                [154, 155], [155, 133], [133, 173], [173, 157], [157, 158], [158, 159],
+                [159, 160], [160, 161], [161, 246], [246, 33]
+            ],
+            // 右眼
+            rightEye: [
+                [362, 382], [382, 381], [381, 380], [380, 374], [374, 373], [373, 390],
+                [390, 249], [249, 263], [263, 466], [466, 388], [388, 387], [387, 386],
+                [386, 385], [385, 384], [384, 398], [398, 362]
+            ],
+            // 左眉
+            leftBrow: [
+                [46, 53], [53, 52], [52, 65], [65, 55], [55, 107], [107, 66],
+                [66, 105], [105, 63], [63, 70]
+            ],
+            // 右眉
+            rightBrow: [
+                [276, 283], [283, 282], [282, 295], [295, 285], [285, 336], [336, 296],
+                [296, 334], [334, 293], [293, 300]
+            ],
+            // 嘴唇外圈
+            lipsOuter: [
+                [61, 146], [146, 91], [91, 181], [181, 84], [84, 17], [17, 314],
+                [314, 405], [405, 321], [321, 375], [375, 291], [291, 409], [409, 270],
+                [270, 269], [269, 267], [267, 0], [0, 37], [37, 39], [39, 40],
+                [40, 185], [185, 61]
+            ],
+            // 嘴唇内圈
+            lipsInner: [
+                [78, 95], [95, 88], [88, 178], [178, 87], [87, 14], [14, 317],
+                [317, 402], [402, 318], [318, 324], [324, 308], [308, 415], [415, 310],
+                [310, 311], [311, 312], [312, 13], [13, 82], [82, 81], [81, 80],
+                [80, 191], [191, 78]
+            ],
+            // 鼻子
+            nose: [
+                [168, 6], [6, 197], [197, 195], [195, 5], [5, 4], [4, 1],
+                [1, 19], [19, 94], [94, 2]
+            ]
+        };
+        
+        // 关键点索引
+        const KEY_POINTS = {
+            noseTip: 4,
+            leftEyeInner: 133,
+            leftEyeOuter: 33,
+            rightEyeInner: 362,
+            rightEyeOuter: 263,
+            mouthTop: 13,
+            mouthBottom: 14,
+            leftEyeTop: 159,
+            leftEyeBottom: 145,
+            rightEyeTop: 386,
+            rightEyeBottom: 374,
+            leftBrowInner: 107,
+            rightBrowInner: 336,
+            chin: 152
+        };
+        
+        // DOM 元素
+        const video = document.getElementById('videoElement');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        const avatarCanvas = document.getElementById('avatarCanvas');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        const mainCtx = mainCanvas.getContext('2d');
+        const overlayCtx = overlayCanvas.getContext('2d');
+        const avatarCtx = avatarCanvas.getContext('2d');
+        
+        // 状态变量
+        let currentFaceLandmarks = null;
+        let currentExpression = 'neutral';
+        let expressionConfidence = 0;
+        let facingMode = 'user';
+        let renderMode = 'mesh';
+        let camera = null;
+        
+        // 初始化画布尺寸
+        function initCanvases() {
+            const container = document.querySelector('.main-view');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            mainCanvas.width = width;
+            mainCanvas.height = height;
+            overlayCanvas.width = width;
+            overlayCanvas.height = height;
+            
+            avatarCanvas.width = avatarCanvas.clientWidth;
+            avatarCanvas.height = avatarCanvas.clientHeight;
+        }
+        
+        // 初始化 MediaPipe Face Mesh
+        async function initFaceMesh() {
+            const faceMesh = new FaceMesh({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
+                }
+            });
+            
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            faceMesh.onResults(onFaceMeshResults);
+            
+            return faceMesh;
+        }
+        
+        // 初始化摄像头
+        async function initCamera(faceMesh) {
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    await faceMesh.send({ image: video });
+                },
+                width: 1280,
+                height: 720,
+                facingMode: facingMode
+            });
+            
+            await camera.start();
+            loadingOverlay.classList.add('hidden');
+            updateStatus('面部追踪已启动', true);
+        }
+        
+        // 处理面部网格结果
+        function onFaceMeshResults(results) {
+            // 清除画布
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            
+            // 绘制背景
+            drawBackground();
+            
+            // 绘制视频帧（如果启用）
+            if (CONFIG.videoOpacity > 0) {
+                mainCtx.globalAlpha = CONFIG.videoOpacity;
+                mainCtx.save();
+                mainCtx.scale(-1, 1);
+                mainCtx.drawImage(results.image, -mainCanvas.width, 0, mainCanvas.width, mainCanvas.height);
+                mainCtx.restore();
+                mainCtx.globalAlpha = 1;
+            }
+            
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                currentFaceLandmarks = results.multiFaceLandmarks[0];
+                
+                // 更新关键点计数
+                document.getElementById('landmarkCount').textContent = currentFaceLandmarks.length;
+                
+                // 根据渲染模式绘制
+                switch (renderMode) {
+                    case 'mesh':
+                        drawFaceMesh();
+                        break;
+                    case 'points':
+                        drawFacePoints();
+                        break;
+                    case 'contour':
+                        drawFaceContours();
+                        break;
+                    case 'heatmap':
+                        drawHeatmap();
+                        break;
+                }
+                
+                // 分析表情
+                analyzeExpression();
+                
+                // 更新指标
+                updateMetrics();
+                
+                // 绘制虚拟头像
+                drawAvatar();
+            } else {
+                currentFaceLandmarks = null;
+                document.getElementById('landmarkCount').textContent = '0';
+            }
+        }
+        
+        // 绘制背景
+        function drawBackground() {
+            const gradient = mainCtx.createLinearGradient(0, 0, mainCanvas.width, mainCanvas.height);
+            gradient.addColorStop(0, '#0a0a12');
+            gradient.addColorStop(0.5, '#0f1525');
+            gradient.addColorStop(1, '#0a0a12');
+            
+            mainCtx.fillStyle = gradient;
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            
+            // 网格效果
+            mainCtx.strokeStyle = 'rgba(0, 245, 255, 0.03)';
+            mainCtx.lineWidth = 1;
+            
+            const gridSize = 30;
+            for (let x = 0; x < mainCanvas.width; x += gridSize) {
+                mainCtx.beginPath();
+                mainCtx.moveTo(x, 0);
+                mainCtx.lineTo(x, mainCanvas.height);
+                mainCtx.stroke();
+            }
+            for (let y = 0; y < mainCanvas.height; y += gridSize) {
+                mainCtx.beginPath();
+                mainCtx.moveTo(0, y);
+                mainCtx.lineTo(mainCanvas.width, y);
+                mainCtx.stroke();
+            }
+        }
+        
+        // 绘制面部网格
+        function drawFaceMesh() {
+            if (!currentFaceLandmarks) return;
+            
+            // 绘制所有连接线
+            Object.entries(FACE_MESH_CONNECTIONS).forEach(([region, connections]) => {
+                let color, lineWidth;
+                
+                switch (region) {
+                    case 'leftEye':
+                    case 'rightEye':
+                        color = 'rgba(0, 255, 255, 0.8)';
+                        lineWidth = 2;
+                        break;
+                    case 'leftBrow':
+                    case 'rightBrow':
+                        color = 'rgba(255, 200, 0, 0.7)';
+                        lineWidth = 2;
+                        break;
+                    case 'lipsOuter':
+                        color = 'rgba(255, 100, 150, 0.8)';
+                        lineWidth = 2;
+                        break;
+                    case 'lipsInner':
+                        color = 'rgba(255, 50, 100, 0.9)';
+                        lineWidth = 1.5;
+                        break;
+                    case 'nose':
+                        color = 'rgba(255, 255, 100, 0.6)';
+                        lineWidth = 1.5;
+                        break;
+                    case 'silhouette':
+                        color = 'rgba(0, 245, 255, 0.5)';
+                        lineWidth = 1.5;
+                        break;
+                    default:
+                        color = 'rgba(0, 245, 255, 0.3)';
+                        lineWidth = 1;
+                }
+                
+                overlayCtx.strokeStyle = color;
+                overlayCtx.lineWidth = lineWidth;
+                overlayCtx.lineJoin = 'round';
+                overlayCtx.lineCap = 'round';
+                
+                connections.forEach(([startIdx, endIdx]) => {
+                    const start = getLandmarkPosition(startIdx);
+                    const end = getLandmarkPosition(endIdx);
+                    
+                    overlayCtx.beginPath();
+                    overlayCtx.moveTo(start.x, start.y);
+                    overlayCtx.lineTo(end.x, end.y);
+                    overlayCtx.stroke();
+                });
+            });
+            
+            // 绘制关键点
+            drawKeyPoints();
+        }
+        
+        // 绘制面部点阵
+        function drawFacePoints() {
+            if (!currentFaceLandmarks) return;
+            
+            currentFaceLandmarks.forEach((landmark, index) => {
+                const pos = getLandmarkPosition(index);
+                
+                // 根据深度值设置颜色和大小
+                const depth = landmark.z;
+                const size = Math.max(1, 3 - depth * 50);
+                const alpha = Math.max(0.3, 1 - Math.abs(depth) * 10);
+                
+                let hue = 180 + depth * 500; // 从青色到紫色
+                overlayCtx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+                
+                overlayCtx.beginPath();
+                overlayCtx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+                overlayCtx.fill();
+            });
+        }
+        
+        // 绘制面部轮廓
+        function drawFaceContours() {
+            if (!currentFaceLandmarks) return;
+            
+            // 只绘制主要轮廓
+            const contourRegions = ['silhouette', 'leftEye', 'rightEye', 'lipsOuter', 'nose'];
+            
+            contourRegions.forEach(region => {
+                const connections = FACE_MESH_CONNECTIONS[region];
+                if (!connections) return;
+                
+                let color;
+                switch (region) {
+                    case 'silhouette':
+                        color = '#00f5ff';
+                        break;
+                    case 'leftEye':
+                    case 'rightEye':
+                        color = '#ff00ff';
+                        break;
+                    case 'lipsOuter':
+                        color = '#ff4488';
+                        break;
+                    case 'nose':
+                        color = '#ffff00';
+                        break;
+                }
+                
+                overlayCtx.strokeStyle = color;
+                overlayCtx.lineWidth = 3;
+                overlayCtx.shadowColor = color;
+                overlayCtx.shadowBlur = 15;
+                
+                overlayCtx.beginPath();
+                connections.forEach(([startIdx, endIdx], i) => {
+                    const start = getLandmarkPosition(startIdx);
+                    const end = getLandmarkPosition(endIdx);
+                    
+                    if (i === 0) {
+                        overlayCtx.moveTo(start.x, start.y);
+                    }
+                    overlayCtx.lineTo(end.x, end.y);
+                });
+                overlayCtx.stroke();
+                overlayCtx.shadowBlur = 0;
+            });
+        }
+        
+        // 绘制热力图
+        function drawHeatmap() {
+            if (!currentFaceLandmarks) return;
+            
+            // 创建热力图
+            currentFaceLandmarks.forEach((landmark, index) => {
+                const pos = getLandmarkPosition(index);
+                
+                // 根据面部区域和深度创建热力效果
+                let intensity;
+                if (index >= 61 && index <= 291) { // 嘴巴区域
+                    intensity = 1.0;
+                } else if (isEyeRegion(index)) {
+                    intensity = 0.9;
+                } else if (isBrowRegion(index)) {
+                    intensity = 0.7;
+                } else {
+                    intensity = 0.5;
+                }
+                
+                const gradient = overlayCtx.createRadialGradient(
+                    pos.x, pos.y, 0,
+                    pos.x, pos.y, 15 * intensity
+                );
+                
+                const hue = 60 - intensity * 60; // 从黄色到红色
+                gradient.addColorStop(0, `hsla(${hue}, 100%, 50%, ${intensity * 0.6})`);
+                gradient.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+                
+                overlayCtx.fillStyle = gradient;
+                overlayCtx.fillRect(pos.x - 20, pos.y - 20, 40, 40);
+            });
+        }
+        
+        // 绘制关键点
+        function drawKeyPoints() {
+            if (!currentFaceLandmarks) return;
+            
+            Object.entries(KEY_POINTS).forEach(([name, index]) => {
+                const pos = getLandmarkPosition(index);
+                
+                // 外圈发光效果
+                overlayCtx.beginPath();
+                overlayCtx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+                overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                overlayCtx.fill();
+                
+                // 内圈
+                overlayCtx.beginPath();
+                overlayCtx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+                overlayCtx.fillStyle = '#ffffff';
+                overlayCtx.fill();
+            });
+        }
+        
+        // 获取关键点位置（屏幕坐标）
+        function getLandmarkPosition(index) {
+            const landmark = currentFaceLandmarks[index];
+            return {
+                x: (1 - landmark.x) * overlayCanvas.width,
+                y: landmark.y * overlayCanvas.height,
+                z: landmark.z
+            };
+        }
+        
+        // 判断是否为眼睛区域
+        function isEyeRegion(index) {
+            return (index >= 33 && index <= 173) || (index >= 249 && index <= 398);
+        }
+        
+        // 判断是否为眉毛区域
+        function isBrowRegion(index) {
+            return (index >= 46 && index <= 107) || (index >= 276 && index <= 336);
+        }
+        
+        // 分析表情
+        function analyzeExpression() {
+            if (!currentFaceLandmarks) return;
+            
+            // 计算面部特征
+            const mouthOpen = calculateMouthOpenness();
+            const eyeOpen = calculateEyeOpenness();
+            const browRaise = calculateBrowRaise();
+            
+            // 简单的表情分类
+            let expression = 'neutral';
+            let confidence = 70;
+            
+            if (mouthOpen > 0.15) {
+                if (browRaise > 0.05) {
+                    expression = 'surprised';
+                    confidence = Math.min(95, 70 + mouthOpen * 100 + browRaise * 200);
+                } else {
+                    expression = 'happy';
+                    confidence = Math.min(95, 70 + mouthOpen * 100);
+                }
+            } else if (browRaise < -0.03) {
+                expression = 'angry';
+                confidence = Math.min(90, 70 - browRaise * 300);
+            } else if (eyeOpen < 0.02) {
+                expression = 'sad';
+                confidence = Math.min(85, 70 + (0.03 - eyeOpen) * 500);
+            }
+            
+            currentExpression = expression;
+            expressionConfidence = confidence;
+            
+            // 更新 UI
+            const expr = EXPRESSIONS[expression];
+            document.getElementById('expressionEmoji').textContent = expr.emoji;
+            document.getElementById('expressionName').textContent = expr.name;
+            document.getElementById('expressionName').style.color = expr.color;
+            document.getElementById('expressionConfidence').textContent = confidence.toFixed(0) + '%';
+        }
+        
+        // 计算嘴巴张度
+        function calculateMouthOpenness() {
+            const top = getLandmarkPosition(KEY_POINTS.mouthTop);
+            const bottom = getLandmarkPosition(KEY_POINTS.mouthBottom);
+            const distance = Math.abs(bottom.y - top.y);
+            return distance / overlayCanvas.height;
+        }
+        
+        // 计算眼睛张度
+        function calculateEyeOpenness() {
+            const leftTop = getLandmarkPosition(KEY_POINTS.leftEyeTop);
+            const leftBottom = getLandmarkPosition(KEY_POINTS.leftEyeBottom);
+            const rightTop = getLandmarkPosition(KEY_POINTS.rightEyeTop);
+            const rightBottom = getLandmarkPosition(KEY_POINTS.rightEyeBottom);
+            
+            const leftOpen = Math.abs(leftBottom.y - leftTop.y);
+            const rightOpen = Math.abs(rightBottom.y - rightTop.y);
+            
+            return (leftOpen + rightOpen) / 2 / overlayCanvas.height;
+        }
+        
+        // 计算眉毛抬起程度
+        function calculateBrowRaise() {
+            const leftBrow = getLandmarkPosition(KEY_POINTS.leftBrowInner);
+            const rightBrow = getLandmarkPosition(KEY_POINTS.rightBrowInner);
+            const noseTip = getLandmarkPosition(KEY_POINTS.noseTip);
+            
+            const avgBrowY = (leftBrow.y + rightBrow.y) / 2;
+            const normalizedDistance = (noseTip.y - avgBrowY) / overlayCanvas.height;
+            
+            return normalizedDistance - 0.1; // 基准偏移
+        }
+        
+        // 更新指标显示
+        function updateMetrics() {
+            if (!currentFaceLandmarks) return;
+            
+            const mouthOpen = calculateMouthOpenness();
+            const eyeOpen = calculateEyeOpenness();
+            const browRaise = calculateBrowRaise();
+            
+            // 计算头部倾斜
+            const leftEye = getLandmarkPosition(KEY_POINTS.leftEyeOuter);
+            const rightEye = getLandmarkPosition(KEY_POINTS.rightEyeOuter);
+            const headTilt = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * 180 / Math.PI;
+            
+            document.getElementById('mouthOpenness').textContent = (mouthOpen * 100).toFixed(0);
+            document.getElementById('eyeOpenness').textContent = (eyeOpen * 100).toFixed(0);
+            document.getElementById('browRaise').textContent = (browRaise * 100).toFixed(0);
+            document.getElementById('headTilt').textContent = headTilt.toFixed(1) + '°';
+        }
+        
+        // 绘制虚拟头像
+        function drawAvatar() {
+            avatarCtx.clearRect(0, 0, avatarCanvas.width, avatarCanvas.height);
+            
+            const centerX = avatarCanvas.width / 2;
+            const centerY = avatarCanvas.height / 2;
+            const headRadius = 60;
+            
+            // 头部背景
+            const headGradient = avatarCtx.createRadialGradient(
+                centerX - 20, centerY - 20, 0,
+                centerX, centerY, headRadius
+            );
+            headGradient.addColorStop(0, '#ffd8b1');
+            headGradient.addColorStop(1, '#e8c090');
+            
+            avatarCtx.beginPath();
+            avatarCtx.arc(centerX, centerY, headRadius, 0, Math.PI * 2);
+            avatarCtx.fillStyle = headGradient;
+            avatarCtx.fill();
+            avatarCtx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            avatarCtx.lineWidth = 2;
+            avatarCtx.stroke();
+            
+            // 根据当前表情绘制面部特征
+            drawAvatarEyes(centerX, centerY, currentExpression);
+            drawAvatarBrows(centerX, centerY, currentExpression);
+            drawAvatarMouth(centerX, centerY, currentExpression);
+            
+            // 表情标签
+            avatarCtx.fillStyle = EXPRESSIONS[currentExpression].color;
+            avatarCtx.font = 'bold 12px Orbitron';
+            avatarCtx.textAlign = 'center';
+            avatarCtx.fillText(EXPRESSIONS[currentExpression].name, centerX, centerY + headRadius + 20);
+        }
+        
+        // 绘制头像眼睛
+        function drawAvatarEyes(cx, cy, expression) {
+            const eyeY = cy - 10;
+            const eyeSpacing = 22;
+            
+            [-1, 1].forEach(side => {
+                const eyeX = cx + side * eyeSpacing;
+                
+                // 眼白
+                avatarCtx.beginPath();
+                avatarCtx.ellipse(eyeX, eyeY, 10, expression === 'surprised' ? 12 : 8, 0, 0, Math.PI * 2);
+                avatarCtx.fillStyle = '#ffffff';
+                avatarCtx.fill();
+                avatarCtx.strokeStyle = '#666';
+                avatarCtx.lineWidth = 1;
+                avatarCtx.stroke();
+                
+                // 瞳孔
+                let pupilSize = expression === 'surprised' ? 4 : 6;
+                let pupilColor = '#333';
+                
+                if (expression === 'happy') {
+                    pupilColor = '#ffd700';
+                } else if (expression === 'angry') {
+                    pupilColor = '#ff4444';
+                }
+                
+                avatarCtx.beginPath();
+                avatarCtx.arc(eyeX, eyeY, pupilSize, 0, Math.PI * 2);
+                avatarCtx.fillStyle = pupilColor;
+                avatarCtx.fill();
+                
+                // 高光
+                avatarCtx.beginPath();
+                avatarCtx.arc(eyeX - 2, eyeY - 2, 2, 0, Math.PI * 2);
+                avatarCtx.fillStyle = '#fff';
+                avatarCtx.fill();
+                
+                // 悲伤时的眼睑
+                if (expression === 'sad') {
+                    avatarCtx.beginPath();
+                    avatarCtx.ellipse(eyeX, eyeY - 5, 12, 6, 0, 0, Math.PI);
+                    avatarCtx.fillStyle = '#ffd8b1';
+                    avatarCtx.fill();
+                }
+            });
+        }
+        
+        // 绘制头像眉毛
+        function drawAvatarBrows(cx, cy, expression) {
+            const browY = cy - 25;
+            const browSpacing = 22;
+            
+            avatarCtx.strokeStyle = '#8b4513';
+            avatarCtx.lineWidth = 3;
+            avatarCtx.lineCap = 'round';
+            
+            [-1, 1].forEach(side => {
+                const browX = cx + side * browSpacing;
+                
+                avatarCtx.save();
+                avatarCtx.translate(browX, browY);
+                
+                let angle = 0;
+                if (expression === 'angry') {
+                    angle = side * 0.3;
+                } else if (expression === 'surprised') {
+                    angle = side * -0.2;
+                } else if (expression === 'sad') {
+                    angle = side * -0.4;
+                }
+                
+                avatarCtx.rotate(angle);
+                
+                avatarCtx.beginPath();
+                avatarCtx.moveTo(-10, 0);
+                avatarCtx.quadraticCurveTo(0, expression === 'surprised' ? -8 : -3, 10, 0);
+                avatarCtx.stroke();
+                
+                avatarCtx.restore();
+            });
+        }
+        
+        // 绘制头像嘴巴
+        function drawAvatarMouth(cx, cy, expression) {
+            const mouthY = cy + 25;
+            
+            avatarCtx.strokeStyle = '#cc6666';
+            avatarCtx.lineWidth = 3;
+            avatarCtx.lineCap = 'round';
+            
+            avatarCtx.beginPath();
+            
+            if (expression === 'happy') {
+                avatarCtx.arc(cx, mouthY - 5, 15, 0.2 * Math.PI, 0.8 * Math.PI);
+                avatarCtx.stroke();
+                
+                // 舌头
+                avatarCtx.beginPath();
+                avatarCtx.arc(cx, mouthY + 3, 5, 0, Math.PI);
+                avatarCtx.fillStyle = '#ff7777';
+                avatarCtx.fill();
+            } else if (expression === 'sad') {
+                avatarCtx.arc(cx, mouthY + 10, 12, 1.2 * Math.PI, 1.8 * Math.PI);
+                avatarCtx.stroke();
+            } else if (expression === 'surprised') {
+                avatarCtx.ellipse(cx, mouthY, 8, 12, 0, 0, Math.PI * 2);
+                avatarCtx.fillStyle = '#cc4444';
+                avatarCtx.fill();
+            } else if (expression === 'angry') {
+                avatarCtx.moveTo(cx - 15, mouthY);
+                avatarCtx.lineTo(cx + 15, mouthY);
+                avatarCtx.lineWidth = 4;
+                avatarCtx.stroke();
+            } else {
+                avatarCtx.moveTo(cx - 12, mouthY);
+                avatarCtx.quadraticCurveTo(cx, mouthY + 5, cx + 12, mouthY);
+                avatarCtx.stroke();
+            }
+        }
+        
+        // 更新状态显示
+        function updateStatus(message, isActive) {
+            document.getElementById('statusText').textContent = message;
+            document.getElementById('statusDot').className = 'status-dot' + (isActive ? ' active' : '');
+        }
+        
+        // 截图功能
+        function captureScreenshot() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = mainCanvas.width;
+            tempCanvas.height = mainCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.drawImage(mainCanvas, 0, 0);
+            tempCtx.drawImage(overlayCanvas, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = `face-mesh-${Date.now()}.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // 导出数据功能
+        function exportData() {
+            if (!currentFaceLandmarks) {
+                alert('没有检测到面部数据');
+                return;
+            }
+            
+            const data = {
+                timestamp: new Date().toISOString(),
+                expression: currentExpression,
+                confidence: expressionConfidence,
+                landmarks: currentFaceLandmarks.map(lm => ({
+                    x: lm.x,
+                    y: lm.y,
+                    z: lm.z
+                })),
+                metrics: {
+                    mouthOpenness: calculateMouthOpenness(),
+                    eyeOpenness: calculateEyeOpenness(),
+                    browRaise: calculateBrowRaise()
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.download = `face-data-${Date.now()}.json`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+        
+        // 切换摄像头
+        async function toggleCamera() {
+            facingMode = facingMode === 'user' ? 'environment' : 'user';
+            if (camera) {
+                camera.stop();
+            }
+            const faceMesh = await initFaceMesh();
+            await initCamera(faceMesh);
+        }
+        
+        // 切换视频显示
+        function toggleVideo() {
+            CONFIG.videoOpacity = CONFIG.videoOpacity > 0 ? 0 : 0.3;
+            document.getElementById('toggleVideo').classList.toggle('active', CONFIG.videoOpacity > 0);
+        }
+        
+        // 事件监听
+        document.getElementById('toggleCamera').addEventListener('click', toggleCamera);
+        document.getElementById('toggleVideo').addEventListener('click', toggleVideo);
+        document.getElementById('captureBtn').addEventListener('click', captureScreenshot);
+        document.getElementById('exportBtn').addEventListener('click', exportData);
+        
+        // 渲染模式切换
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderMode = btn.dataset.mode;
+            });
+        });
+        
+        // 窗口大小调整
+        window.addEventListener('resize', initCanvases);
+        
+        // 初始化
+        async function init() {
+            initCanvases();
+            updateStatus('正在加载模型...', false);
+            
+            try {
+                const faceMesh = await initFaceMesh();
+                await initCamera(faceMesh);
+            } catch (error) {
+                console.error('初始化失败:', error);
+                updateStatus('初始化失败: ' + error.message, false);
+                loadingOverlay.querySelector('.loading-text').textContent = '初始化失败，请刷新页面重试';
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>
